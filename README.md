@@ -1,1 +1,13 @@
-# renderer
+TODO:
+- scroll verbeteren
+- viewport resizable maken
+- grid aan en uit kunnen zetten
+- gridlijnen vast aantal pixels maken
+- achtergrondkleur aan kunnen passen (default donkergrijs)
+- pannen met recher muisklik ipv linker
+- selecteren van objecten met linker muisklik
+- functie muiscoordinaten naar world coordinaten en andersom
+- meer oop, aparte struct voor viewport etc.
+- struct naar andere files
+- screenshots kunnen maken
+- fps counter
