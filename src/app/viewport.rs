@@ -23,8 +23,8 @@ impl Viewport {
     }
 
     pub fn draw_gizmo(&self, painter: &egui::Painter, transform: &Transform) {
-        let pos = transform.get_pos();
-        let angle = transform.get_angle();
+        let pos = transform.pos();
+        let angle = transform.angle();
             
         let x_axis = egui::Vec2::new(f32::cos(angle), f32::sin(angle));
         let y_axis = egui::Vec2::new(-f32::sin(angle), f32::cos(angle));
@@ -49,20 +49,20 @@ impl Viewport {
         egui::Vec2::new(x, y)
     }
 
-    pub fn draw_object(&self, painter: &egui::Painter, object: &Object, _selected: bool) {
-        let transform = object.get_transform();
+    // pub fn draw_object(&self, painter: &egui::Painter, object: &Object, _selected: bool) {
+    //     let transform = object.get_transform();
         
-        if let Some(geometry) = object.get_geometry() && let Some(fill_color) = object.get_fill_color() && let Some(stroke) = object.get_stroke() {
-            let mut vertices: Vec<egui::Pos2> = vec![];
-            for vertex in geometry.get_vertices().iter() {
-                let viewport_vertex = self.world_pos_to_viewport_pos(
-                    &(transform.get_pos() + self.rotate(vertex.to_vec2(), transform.get_angle()))// * egui::Vec2::new(f32::cos(transform.get_angle()), f32::sin(transform.get_angle())))
-                );
-                vertices.push(viewport_vertex);
-            }
-            painter.add(Shape::convex_polygon(vertices, fill_color, stroke));
-        }
-    }
+    //     if let Some(geometry) = object.get_geometry() && let Some(fill_color) = object.get_fill_color() && let Some(stroke) = object.get_stroke() {
+    //         let mut vertices: Vec<egui::Pos2> = vec![];
+    //         for vertex in geometry.get_vertices().iter() {
+    //             let viewport_vertex = self.world_pos_to_viewport_pos(
+    //                 &(transform.get_pos() + self.rotate(vertex.to_vec2(), transform.get_angle()))// * egui::Vec2::new(f32::cos(transform.get_angle()), f32::sin(transform.get_angle())))
+    //             );
+    //             vertices.push(viewport_vertex);
+    //         }
+    //         painter.add(Shape::convex_polygon(vertices, fill_color, stroke));
+    //     }
+    // }
 
     pub fn draw_grid(&self, painter: &egui::Painter) {
         let x_min = self.camera_pos.x - self.camera_zoom;
