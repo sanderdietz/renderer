@@ -1,4 +1,3 @@
-use eframe::egui;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub mod transform;
@@ -13,7 +12,6 @@ pub struct Object {
     name: String,
     transform: Transform,
     shape: Option<Shape>,
-    default_shape: DefaultShape,
     default_values: DefaultValues
 }
 
@@ -24,7 +22,6 @@ impl Object {
             name: name,
             transform: Transform::ZERO,
             shape: None,
-            default_shape: DefaultShape::Rectangle,
             default_values: DefaultValues::new()
         }
     }
@@ -33,12 +30,12 @@ impl Object {
         self.shape = Some(shape);
     }
 
-    pub fn set_transform(&mut self, transform: Transform) {
-        self.transform = transform;
-    }
-
     pub fn transform(&self) -> &Transform {
         &self.transform
+    }
+
+    pub fn transform_mut(&mut self) -> &mut Transform {
+        &mut self.transform
     }
 
     pub fn id(&self) -> usize {
@@ -49,16 +46,16 @@ impl Object {
         &self.name
     }
 
+    pub fn shape_mut(&mut self) -> Option<&mut Shape> {
+        self.shape.as_mut()
+    }
+
     pub fn shape(&self) -> Option<&Shape> {
         self.shape.as_ref()
     }
 
-    pub fn default_shape(&mut self) -> &mut DefaultShape {
-        &mut self.default_shape
-    }
-
-    pub fn default_values(&self) -> &DefaultValues {
-        &self.default_values
+    pub fn default_values(&mut self) -> &mut DefaultValues {
+        &mut self.default_values
     }
 }
 

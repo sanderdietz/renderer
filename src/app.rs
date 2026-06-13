@@ -4,7 +4,6 @@ pub mod viewport;
 use viewport::Viewport;
 pub mod object;
 use object::Object;
-use object::transform::Transform;
 use object::geometry::*;
 
 pub struct App {
@@ -13,35 +12,18 @@ pub struct App {
     selected_object_id: Option<usize>,
     draw_grid: bool,
     new_object: bool,
-    new_name: String,
-    new_default_shape: DefaultShape
+    new_name: String
 }
 
 impl App {
     pub fn new() -> Self {
-        // let mut object1 = Object::new("obj1");
-        // // let mut geometry = Polygon::new(vec![]);
-        // // geometry.add(egui::Pos2::new(-0.2, -0.2));
-        // // geometry.add(egui::Pos2::new(0.2, -0.2));
-        // // geometry.add(egui::Pos2::new(0.2, 0.2));
-        // // geometry.add(egui::Pos2::new(-0.2, 0.2));
-        // // object1.set_geometry(geometry);
-
-        // let object2 = Object::new("obj2");
-
-        // let object3 = Object::new("obj3");
-
-        // let mut object4 = Object::new("obj4");
-        // object4.set_transform(Transform::new(egui::Pos2::new(0.5, 0.25), 0.0));
-        
         Self {
             viewport: None,
-            objects: Vec::new(),//vec![object1, object2, object3, object4],
+            objects: Vec::new(),
             selected_object_id: None,
             draw_grid: true,
             new_object: false,
-            new_name: String::from("new object"),
-            new_default_shape: DefaultShape::Rectangle
+            new_name: String::from("new object")
         }
     }
 
@@ -152,73 +134,162 @@ impl eframe::App for App {
                 egui::CollapsingHeader::new("Transform")
                     .default_open(true)
                     .show(ui, |ui| {
-                        let transform = object.transform();
-                        let mut pos = transform.pos();
-                        let mut scale = transform.scale();
-                        let mut angle = transform.angle();
+                        let transform = object.transform_mut();
                         ui.label("Position");
                         ui.horizontal(|ui| {
                             ui.label("x:");
-                            ui.add(egui::DragValue::new(&mut pos.x).speed(0.01));
+                            ui.add(egui::DragValue::new(&mut transform.pos.x).speed(0.01));
                             ui.label("y:");
-                            ui.add(egui::DragValue::new(&mut pos.y).speed(0.01));
+                            ui.add(egui::DragValue::new(&mut transform.pos.y).speed(0.01));
                         });
                         ui.label("Scale");
                         ui.horizontal(|ui| {
                             ui.label("x:");
-                            ui.add(egui::DragValue::new(&mut scale.x).speed(0.01));
+                            ui.add(egui::DragValue::new(&mut transform.scale.x).speed(0.01));
                             ui.label("y:");
-                            ui.add(egui::DragValue::new(&mut scale.y).speed(0.01));
+                            ui.add(egui::DragValue::new(&mut transform.scale.y).speed(0.01));
                         });
                         ui.horizontal(|ui| {
                             ui.label("Angle");
-                            ui.add(egui::DragValue::new(&mut angle).speed(0.01));
+                            ui.add(egui::DragValue::new(&mut transform.angle).speed(0.01));
                         });
-                        let transform = Transform::new(pos, scale, angle);
-                        object.set_transform(transform);
                     });
                 
                 // Display shape
                 egui::CollapsingHeader::new("Shape")
                     .default_open(object.shape().is_some())
                     .show(ui, |ui| {
-                        if let Some(shape) = object.shape() {
+                        if let Some(shape) = object.shape_mut() {
                             match shape {
-                                Shape::Path(path) => ui.label("path"),
-                                Shape::Polygon(polygon) => ui.label("polygon"),
-                                Shape::Ellipse(ellipse) => ui.label("ellipse")
-                            };
+                                // Path
+                                Shape::Path(path_shape) => {
+                                    let mut stroke = path_shape.stroke();
+                                    let segments = path_shape.segments_mut();
+                                    let n = segments.len();
+                                    for (i, segment) in segments.iter_mut().enumerate() {
+                                        match segment {
+                                            Segment::Straight(line_segment) => {
+                                                ui.horizontal(|ui| {
+                                                    ui.label("x:");
+                                                    ui.add(egui::DragValue::new(&mut line_segment.start.x).speed(0.01));
+                                                    ui.label("y:");
+                                                    ui.add(egui::DragValue::new(&mut line_segment.start.y).speed(0.01));
+                                                });
+                                                if i == n - 1 {
+                                                    ui.horizontal(|ui| {
+                                                        ui.label("x:");
+                                                        ui.add(egui::DragValue::new(&mut line_segment.end.x).speed(0.01));
+                                                        ui.label("y:");
+                                                        ui.add(egui::DragValue::new(&mut line_segment.end.y).speed(0.01));
+                                                    });
+                                                }
+                                            },
+                                            Segment::Curve(bezier_curve) => {
+                                                let mut start = bezier_curve.start;
+                                            }
+                                        }
+                                    }
+                                    ui.label("Stroke:");
+                                    ui.horizontal(|ui| {
+                                        ui.label("width:");
+                                        ui.add(egui::DragValue::new(&mut stroke.width).speed(0.01).range(0.0..=f32::INFINITY));
+                                        ui.label("color:");
+                                        egui::color_picker::color_edit_button_srgba(ui, &mut stroke.color, egui::color_picker::Alpha::Opaque);
+                                    });
+                                    path_shape.set_stroke(stroke);
+                                },
+                                // Polygon
+                                Shape::Polygon(polygon_shape) => {
+                                    let mut color = polygon_shape.color();
+                                    let mut stroke = polygon_shape.stroke();
+                                    let segments = polygon_shape.segments_mut();
+                                    let n = segments.len();
+                                    for (i, segment) in segments.iter_mut().enumerate() {
+                                        match segment {
+                                            Segment::Straight(line_segment) => {
+                                                ui.horizontal(|ui| {
+                                                    ui.label("x:");
+                                                    ui.add(egui::DragValue::new(&mut line_segment.start.x).speed(0.01));
+                                                    ui.label("y:");
+                                                    ui.add(egui::DragValue::new(&mut line_segment.start.y).speed(0.01));
+                                                });
+                                            },
+                                            Segment::Curve(bezier_curve) => {
+                                                let mut start = bezier_curve.start;
+                                            }
+                                        }
+                                    }
+                                    ui.label("Color:");
+                                    egui::color_picker::color_edit_button_srgba(ui, &mut color, egui::color_picker::Alpha::Opaque);
+                                    ui.label("Stroke:");
+                                    ui.horizontal(|ui| {
+                                        ui.label("width:");
+                                        ui.add(egui::DragValue::new(&mut stroke.width).speed(0.01).range(0.0..=f32::INFINITY));
+                                        ui.label("color:");
+                                        egui::color_picker::color_edit_button_srgba(ui, &mut stroke.color, egui::color_picker::Alpha::Opaque);
+                                    });
+                                    
+                                    polygon_shape.set_color(color);
+                                    polygon_shape.set_stroke(stroke);
+                                },
+                                // Ellipse
+                                Shape::Ellipse(ellipse_shape) => {
+                                    let mut width = ellipse_shape.width();
+                                    let mut height = ellipse_shape.height();
+                                    let mut color = ellipse_shape.color();
+                                    let mut stroke = ellipse_shape.stroke();
+
+                                    ui.horizontal(|ui| {
+                                        ui.label("Width:");
+                                        ui.add(egui::DragValue::new(&mut width).speed(0.01).range(0.0..=f32::INFINITY));
+                                        ui.label("Height:");
+                                        ui.add(egui::DragValue::new(&mut height).speed(0.01).range(0.0..=f32::INFINITY));
+                                    });
+                                    ui.label("Color:");
+                                    egui::color_picker::color_edit_button_srgba(ui, &mut color, egui::color_picker::Alpha::Opaque);
+                                    ui.label("Stroke:");
+                                    ui.horizontal(|ui| {
+                                        ui.label("width:");
+                                        ui.add(egui::DragValue::new(&mut stroke.width).speed(0.01).range(0.0..=f32::INFINITY));
+                                        ui.label("color:");
+                                        egui::color_picker::color_edit_button_srgba(ui, &mut stroke.color, egui::color_picker::Alpha::Opaque);
+                                    });
+                                    
+                                    ellipse_shape.set_width(width);
+                                    ellipse_shape.set_height(height);
+                                    ellipse_shape.set_color(color);
+                                    ellipse_shape.set_stroke(stroke);
+                                }
+                            }
                         } else {
                             ui.label("No shape");
-                            // let mut default_shape = DefaultShape::Rectangle;
-                            egui::ComboBox::from_label("")
-                                .selected_text(format!("{}", object.default_shape()))
+                            let default_values = object.default_values();
+                            let current_shape = default_values.shape();
+                            egui::ComboBox::from_label(format!("{}", current_shape))
+                                .selected_text(format!("{}", current_shape))
                                 .show_ui(ui, |ui| {
-                                    ui.selectable_value( 
-                                        object.default_shape(), 
-                                        DefaultShape::LineSegment, 
-                                        format!("{}", DefaultShape::LineSegment)
-                                    );
-                                    ui.selectable_value( 
-                                        object.default_shape(), 
-                                        DefaultShape::Rectangle, 
-                                        format!("{}", DefaultShape::Rectangle)
-                                    );
-                                    ui.selectable_value( 
-                                        object.default_shape(), 
-                                        DefaultShape::RegularPolygon, 
-                                        format!("{}", DefaultShape::RegularPolygon)
-                                    );
-                                    ui.selectable_value( 
-                                        object.default_shape(), 
-                                        DefaultShape::Circle, 
-                                        format!("{}", DefaultShape::Circle)
-                                    );
+                                    for default_shape in [
+                                        DefaultShape::LineSegment,
+                                        DefaultShape::Rectangle,
+                                        DefaultShape::RegularPolygon,
+                                        DefaultShape::Circle
+                                    ] {
+                                        if ui.selectable_value(
+                                            &mut default_values.shape(),
+                                            default_shape,
+                                            format!("{}", default_shape)
+                                        ).clicked() {
+                                            default_values.set_shape(default_shape);
+                                        }
+                                    }
                                 });
-                            match object.default_shape() {
+                            
+                            match default_values.shape() {
                                 DefaultShape::LineSegment => {
-                                    let mut start = object.default_values().start();
-                                    let mut end = object.default_values().end();
+                                    let mut start = default_values.start();
+                                    let mut end = default_values.end();
+                                    let mut stroke = default_values.stroke();
+
                                     ui.label("Start");
                                     ui.horizontal(|ui| {
                                         ui.label("x:");
@@ -233,41 +304,106 @@ impl eframe::App for App {
                                         ui.label("y:");
                                         ui.add(egui::DragValue::new(&mut end.y).speed(0.01));
                                     });
-                                    object.default_values();
+                                    ui.label("Stroke:");
+                                    ui.horizontal(|ui| {
+                                        ui.label("width:");
+                                        ui.add(egui::DragValue::new(&mut stroke.width).speed(0.01).range(0.0..=f32::INFINITY));
+                                        ui.label("color:");
+                                        egui::color_picker::color_edit_button_srgba(ui, &mut stroke.color, egui::color_picker::Alpha::Opaque);
+                                    });
+
+                                    default_values.set_start(start);
+                                    default_values.set_end(end);
+                                    default_values.set_stroke(stroke);
                                 },
-                                DefaultShape::Rectangle => {},
-                                DefaultShape::RegularPolygon => {},
-                                DefaultShape::Circle => {},
+                                DefaultShape::Rectangle => {
+                                    let mut width = default_values.width();
+                                    let mut height = default_values.height();
+                                    let mut stroke = default_values.stroke();
+                                    let mut color = default_values.color();
+
+                                    ui.horizontal(|ui| {
+                                        ui.label("width:");
+                                        ui.add(egui::DragValue::new(&mut width).speed(0.01).range(0.0..=f32::INFINITY));
+                                    });
+                                    ui.horizontal(|ui| {
+                                        ui.label("height:");
+                                        ui.add(egui::DragValue::new(&mut height).speed(0.01).range(0.0..=f32::INFINITY));
+                                    });
+                                    ui.label("Stroke:");
+                                    ui.horizontal(|ui| {
+                                        ui.label("width:");
+                                        ui.add(egui::DragValue::new(&mut stroke.width).speed(0.01).range(0.0..=f32::INFINITY));
+                                        ui.label("color:");
+                                        egui::color_picker::color_edit_button_srgba(ui, &mut stroke.color, egui::color_picker::Alpha::Opaque);
+                                    });
+                                    ui.label("Color");
+                                    egui::color_picker::color_edit_button_srgba(ui, &mut color, egui::color_picker::Alpha::Opaque);
+
+                                    default_values.set_width(width);
+                                    default_values.set_height(height);
+                                    default_values.set_stroke(stroke);
+                                    default_values.set_color(color);
+                                },
+                                DefaultShape::RegularPolygon => {
+                                    let mut num_edges = default_values.num_edges();
+                                    let mut radius = default_values.radius();
+                                    let mut stroke = default_values.stroke();
+                                    let mut color = default_values.color();
+
+                                    ui.horizontal(|ui| {
+                                        ui.label("number of edges:");
+                                        ui.add(egui::DragValue::new(&mut num_edges).range(3..=u32::MAX));
+                                    });
+                                    ui.horizontal(|ui| {
+                                        ui.label("radius:");
+                                        ui.add(egui::DragValue::new(&mut radius).speed(0.01).range(0.0..=f32::INFINITY));
+                                    });
+                                    ui.label("Stroke:");
+                                    ui.horizontal(|ui| {
+                                        ui.label("width:");
+                                        ui.add(egui::DragValue::new(&mut stroke.width).speed(0.01).range(0.0..=f32::INFINITY));
+                                        ui.label("color:");
+                                        egui::color_picker::color_edit_button_srgba(ui, &mut stroke.color, egui::color_picker::Alpha::Opaque);
+                                    });
+                                    ui.label("Color");
+                                    egui::color_picker::color_edit_button_srgba(ui, &mut color, egui::color_picker::Alpha::Opaque);
+
+                                    default_values.set_num_edges(num_edges);
+                                    default_values.set_radius(radius);
+                                    default_values.set_stroke(stroke);
+                                    default_values.set_color(color);
+                                },
+                                DefaultShape::Circle => {
+                                    let mut radius = default_values.radius();
+                                    let mut stroke = default_values.stroke();
+                                    let mut color = default_values.color();
+
+                                    ui.horizontal(|ui| {
+                                        ui.label("radius:");
+                                        ui.add(egui::DragValue::new(&mut radius).speed(0.01).range(0.0..=f32::INFINITY));
+                                    });
+                                    ui.label("Stroke:");
+                                    ui.horizontal(|ui| {
+                                        ui.label("width:");
+                                        ui.add(egui::DragValue::new(&mut stroke.width).speed(0.01).range(0.0..=f32::INFINITY));
+                                        ui.label("color:");
+                                        egui::color_picker::color_edit_button_srgba(ui, &mut stroke.color, egui::color_picker::Alpha::Opaque);
+                                    });
+                                    ui.label("Color");
+                                    egui::color_picker::color_edit_button_srgba(ui, &mut color, egui::color_picker::Alpha::Opaque);
+
+                                    default_values.set_radius(radius);
+                                    default_values.set_stroke(stroke);
+                                    default_values.set_color(color);
+                                },
                             }
                             if ui.button("Add shape").clicked() {
-
+                                let shape = Shape::new(object.default_values());
+                                object.set_shape(shape);
                             }
                         }
                     });
-                // ui.label("Transform:");
-                // let mut pos = object.transform().pos();
-                // let mut angle = object.transform().angle();
-                // ui.horizontal(|ui| {
-                //     ui.add(egui::DragValue::new(&mut angle).speed(0.01));
-                // });
-                // let transform = Transform::new(pos, angle);
-                // object.set_transform(transform);
-
-                // if let Some(geometry) = object.get_geometry() {
-                //     ui.label("Geometry:");
-                //     let mut vertices: Vec<egui::Pos2> = vec![];
-                //     for vertex in geometry.get_vertices() {
-                //         let mut x = vertex.x;
-                //         let mut y = vertex.y;
-                //         ui.horizontal(|ui| {
-                //             ui.add(egui::DragValue::new(&mut x).speed(0.01));
-                //             ui.add(egui::DragValue::new(&mut y).speed(0.01));
-                //         });
-                //         vertices.push(egui::Pos2::new(x, y));
-                //     }
-                //     let new_geometry = Polygon::new(vertices);
-                //     object.set_geometry(new_geometry);
-                // }
             }
         });
 
@@ -280,11 +416,11 @@ impl eframe::App for App {
             }
             if let Some(viewport) = &self.viewport {
                 let painter = ui.painter_at(viewport.get_rect());
-                for object in self.objects.iter() {
-                    // viewport.draw_object(&painter, object, self.is_selected(object));
-                }
                 if self.draw_grid {
                     viewport.draw_grid(&painter);
+                }
+                for object in self.objects.iter() {
+                    viewport.draw_object(&painter, object, self.is_selected(object));
                 }
                 if let Some(object) = self.get_selected() {
                     viewport.draw_gizmo(&painter, object.transform());
