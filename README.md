@@ -1,13 +1,14 @@
 TODO:
-- scroll verbeteren
-- viewport resizable maken
-- grid aan en uit kunnen zetten
-- gridlijnen vast aantal pixels maken
-- achtergrondkleur aan kunnen passen (default donkergrijs)
-- pannen met recher muisklik ipv linker
-- selecteren van objecten met linker muisklik
-- functie muiscoordinaten naar world coordinaten en andersom
-- meer oop, aparte struct voor viewport etc.
-- struct naar andere files
-- screenshots kunnen maken
-- fps counter
+- [ ] scroll verbeteren
+- [ ] viewport resizable maken
+- [x] grid aan en uit kunnen zetten
+- [ ] gridlijnen vast aantal pixels maken
+- [ ] achtergrondkleur aan kunnen passen (default donkergrijs)
+- [x] pannen met recher muisklik ipv linker
+- [ ] selecteren van objecten met linker muisklik
+- [x] functie muiscoordinaten naar world coordinaten en andersom
+- [x] meer oop, aparte struct voor viewport etc.
+- [ ] struct naar andere files
+- [ ] screenshots kunnen maken
+- [ ] fps counter
+- [x] nonconvex polygon triangulation: https://www.youtube.com/watch?v=QAdfkylpYwc

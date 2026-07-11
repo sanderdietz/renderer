@@ -1,6 +1,7 @@
 use core::f32;
 
 use eframe::egui;
+use eframe::egui::debug_text::print;
 
 use crate::app::Object;
 use crate::app::object::transform::Transform;
@@ -57,42 +58,41 @@ impl Viewport {
         if let Some(shape) = object.shape() {
             match shape {
                 Shape::Path(path_shape) => {
-                    for segment in path_shape.segments() {
-                        match segment {
-                            Segment::Straight(line_segment) => {
-                                let viewport_start = self.world_pos_to_viewport_pos(
-                                    transform.pos + self.rotate(line_segment.start.to_vec2(), transform.angle)
-                                );
-                                let viewport_end = self.world_pos_to_viewport_pos(
-                                    transform.pos + self.rotate(line_segment.end.to_vec2(), transform.angle)
-                                );
-                                painter.add(egui::Shape::line_segment([viewport_start, viewport_end], path_shape.stroke()));
-                            },
-                            Segment::Curve(bezier_curve) => {
-
-                            }
-                        }
-                    }
+                    self.draw_path(painter, path_shape, transform);
                 },
                 Shape::Polygon(polygon_shape) => {
-                    let mut vertices: Vec<egui::Pos2> = Vec::new();
-                    for segment in polygon_shape.segments() {
-                        match segment {
-                            Segment::Straight(line_segment) => {
-                                let viewport_vertex = self.world_pos_to_viewport_pos(
-                                    transform.pos + self.rotate(line_segment.start.to_vec2(), transform.angle)
-                                );
-                                vertices.push(viewport_vertex);
+                    // painter.add(egui::Shape::convex_polygon(
+                    //     self.vertices_to_viewport(polygon_shape.vertices(), transform), 
+                    //     polygon_shape.color(), 
+                    //     polygon_shape.stroke())
+                    // );
+                    let vertices = polygon_shape.vertices();
+                    let n = vertices.len();
+                    let mut segments = Vec::new();
+                    for i in 0..n {
+                        match i {
+                            0 => {
+                                let line_segment = LineSegment{ start: vertices[n - 1], end: vertices[0] };
+                                segments.push(Segment::Straight(line_segment));
                             },
-                            Segment::Curve(bezier_curve) => {
-                                let viewport_vertex = self.world_pos_to_viewport_pos(
-                                    transform.pos + self.rotate(bezier_curve.start.to_vec2(), transform.angle)
-                                );
-                                vertices.push(viewport_vertex);
+                            i => {
+                                let line_segment = LineSegment{ start: vertices[i - 1], end: vertices[i] };
+                                segments.push(Segment::Straight(line_segment));
                             }
                         }
                     }
-                    painter.add(egui::Shape::convex_polygon(vertices, polygon_shape.color(), polygon_shape.stroke()));
+                    let path = PathShape::new(segments, polygon_shape.stroke());
+
+                    self.draw_polygon(
+                        painter,
+                        &mut self.vertices_to_viewport(vertices, transform),
+                        polygon_shape.color()
+                    );
+                    self.draw_path(
+                        painter,
+                        &path,
+                        transform
+                    );
                 },
                 Shape::Ellipse(ellipse_shape) => {
                     let center = self.world_pos_to_viewport_pos(transform.pos);
@@ -158,7 +158,22 @@ impl Viewport {
         self.camera_pos + inverted 
     }
 
+    pub fn vertices_to_viewport(&self, vertices: &Vec<egui::Pos2>, transform: &Transform) -> Vec<egui::Pos2> {
+        let mut viewport_vertices = Vec::new();
+        for vertex in vertices {
+            let viewport_vertex = self.world_pos_to_viewport_pos(
+                transform.pos + self.rotate(vertex.to_vec2(), transform.angle)
+            );
+            viewport_vertices.push(viewport_vertex);
+        }
+        viewport_vertices
+    }
+
     pub fn update(&mut self, ui: &mut egui::Ui) {
+        // match self.mouse_pos {
+        //     Some(pos) => println!("{}", pos),
+        //     None => println!("Mouse is outside viewport")
+        // }
         self.rect = ui.clip_rect();
         let response = ui.allocate_response(self.rect.size(), egui::Sense::click_and_drag());
 
@@ -177,7 +192,28 @@ impl Viewport {
         }
     }
 
-     pub fn _get_camera_zoom(&self) -> f32 {
+    pub fn check_hitbox(&self, object: &Object) -> bool {
+        match self.mouse_pos {
+            Some(mouse_pos) => {
+                let transform = object.transform();
+                match object.shape() {
+                    Some(Shape::Path(path_shape)) => false,
+                    Some(Shape::Polygon(polygon_shape)) => {
+                        let vertices = self.vertices_to_viewport(polygon_shape.vertices(), transform);
+                        self.pos_in_polygon(mouse_pos, &vertices)
+                    },
+                    Some(Shape::Ellipse(ellipse_shape)) => false,
+                    None => {
+                        let transform_pos = self.world_pos_to_viewport_pos(transform.pos);
+                        transform_pos.distance_sq(mouse_pos) < 6.0 * 6.0
+                    },
+                }
+            }
+            None => false
+        }
+    }
+
+    pub fn _get_camera_zoom(&self) -> f32 {
         self.camera_zoom
     }
 
@@ -195,5 +231,110 @@ impl Viewport {
 
     pub fn _get_mouse_pos(&self) -> Option<egui::Pos2> {
         self.mouse_pos
+    }
+    
+    fn pos_in_polygon(&self, pos: egui::Pos2, vertices: &Vec<egui::Pos2>) -> bool {
+        let mut num_intersections = 0;
+        let n = vertices.len();
+        for i in 0..n {
+            if i == 0 {
+                if intersect(vertices[0], vertices[n - 1], pos, pos + egui::Vec2::UP * self.rect.size().y) {
+                num_intersections += 1;
+                }
+            }
+            else {
+                if intersect(vertices[i], vertices[i - 1], pos, pos + egui::Vec2::UP * self.rect.size().y) {
+                    num_intersections += 1;
+                }
+            }
+        }
+        num_intersections % 2 == 1
+    }
+
+    pub fn triangle_contains_point(&self, vertices: &Vec<egui::Pos2>, i: usize) -> bool {
+        let n = vertices.len();
+        for j in 0..n {
+            let diff = (n + j - i) % n;
+            if diff > 1 && diff < n - 1 {
+                if self.pos_in_polygon(vertices[j], &triangle_from_index(vertices, i))
+                {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    
+    pub fn draw_polygon(&self, painter: &egui::Painter, vertices: &mut Vec<egui::Pos2>, color: egui::Color32) {
+        while vertices.len() > 3 {
+            let n = vertices.len();
+            for i in 0..n {
+                let triangle = triangle_from_index(vertices, i);
+                // println!("a: {}, b: {}, c: {}\nother_vertices:", a, b, c);
+                if get_angle(&triangle) < f32::consts::PI && !self.triangle_contains_point(vertices, i) {
+                    // i is an ear
+                    painter.add(egui::Shape::convex_polygon(
+                        triangle, 
+                        color, 
+                        egui::Stroke::new(1.0, color)
+                    ));
+                    vertices.remove(i);
+                    break;
+                }
+            }
+        }
+        painter.add(egui::Shape::convex_polygon(
+            vertices.clone(),
+            color, 
+            egui::Stroke::new(1.0, color)
+        ));
+    }
+
+    pub fn draw_path(&self, painter: &egui::Painter, path: &PathShape, transform: &Transform) {
+        for segment in path.segments() {
+            match segment {
+                Segment::Straight(line_segment) => {
+                    let endpoints = self.vertices_to_viewport(
+                        &vec![line_segment.start, line_segment.end],
+                        transform
+                    );
+                    painter.add(egui::Shape::line_segment([endpoints[0], endpoints[1]], path.stroke()));
+                },
+                Segment::Curve(bezier_curve) => {
+
+                }
+            }
+        }
+    }
+}
+
+fn ccw(a: egui::Pos2, b: egui::Pos2, c: egui::Pos2) -> bool {
+    (c.y - a.y) * (b.x - a.x) > (b.y - a.y) * (c.x - a.x)
+}
+
+fn intersect(a: egui::Pos2, b: egui::Pos2, c: egui::Pos2, d: egui::Pos2) -> bool {
+    ccw(a, c, d) != ccw(b, c, d) && ccw(a, b, c) != ccw(a, b, d)
+}
+
+fn get_angle(triangle: &Vec<egui::Pos2>) -> f32 {
+    let v1 = triangle[1] - triangle[0];
+    let v2 = triangle[2] - triangle[0];
+    let mut angle = v1.angle() - v2.angle();
+    while angle > f32::consts::TAU {
+        angle -= f32::consts::TAU;
+    }
+    while angle < 0.0 {
+        angle += f32::consts::TAU;
+    }
+    angle
+}
+
+pub fn triangle_from_index(vertices: &Vec<egui::Pos2>, i: usize) -> Vec<egui::Pos2> {
+    let n = vertices.len();
+    match i {
+        0 => vec![vertices[n - 1], vertices[0], vertices[1]],
+        i if i == n - 1 => vec![vertices[n - 2], vertices[n - 1], vertices[0]],
+        i => vec![vertices[i - 1], vertices[i], vertices[i + 1]]
     }
 }

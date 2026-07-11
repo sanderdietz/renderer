@@ -10,6 +10,7 @@ pub struct App {
     viewport: Option<Viewport>,
     objects: Vec<Object>,
     selected_object_id: Option<usize>,
+    hovered_object_id: Option<usize>,
     draw_grid: bool,
     new_object: bool,
     new_name: String
@@ -21,6 +22,7 @@ impl App {
             viewport: None,
             objects: Vec::new(),
             selected_object_id: None,
+            hovered_object_id: None,
             draw_grid: true,
             new_object: false,
             new_name: String::from("new object")
@@ -202,22 +204,14 @@ impl eframe::App for App {
                                 Shape::Polygon(polygon_shape) => {
                                     let mut color = polygon_shape.color();
                                     let mut stroke = polygon_shape.stroke();
-                                    let segments = polygon_shape.segments_mut();
-                                    let n = segments.len();
-                                    for (i, segment) in segments.iter_mut().enumerate() {
-                                        match segment {
-                                            Segment::Straight(line_segment) => {
-                                                ui.horizontal(|ui| {
-                                                    ui.label("x:");
-                                                    ui.add(egui::DragValue::new(&mut line_segment.start.x).speed(0.01));
-                                                    ui.label("y:");
-                                                    ui.add(egui::DragValue::new(&mut line_segment.start.y).speed(0.01));
-                                                });
-                                            },
-                                            Segment::Curve(bezier_curve) => {
-                                                let mut start = bezier_curve.start;
-                                            }
-                                        }
+                                    let vertices = polygon_shape.vertices_mut();
+                                    for vertex in vertices.iter_mut() {
+                                        ui.horizontal(|ui| {
+                                            ui.label("x:");
+                                            ui.add(egui::DragValue::new(&mut vertex.x).speed(0.01));
+                                            ui.label("y:");
+                                            ui.add(egui::DragValue::new(&mut vertex.y).speed(0.01));
+                                        });
                                     }
                                     ui.label("Color:");
                                     egui::color_picker::color_edit_button_srgba(ui, &mut color, egui::color_picker::Alpha::Opaque);
@@ -408,6 +402,10 @@ impl eframe::App for App {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
+            // match self.hovered_object_id {
+            //     Some(id) => println!("{id}"),
+            //     None => println!("No object is hovered over")
+            // }
             if let Some(viewport) = &mut self.viewport {
                 viewport.update(ui);
             } else {
@@ -419,8 +417,12 @@ impl eframe::App for App {
                 if self.draw_grid {
                     viewport.draw_grid(&painter);
                 }
+                self.hovered_object_id = None;
                 for object in self.objects.iter() {
                     viewport.draw_object(&painter, object, self.is_selected(object));
+                    if viewport.check_hitbox(object) {
+                        self.hovered_object_id = Some(object.id());
+                    }
                 }
                 if let Some(object) = self.get_selected() {
                     viewport.draw_gizmo(&painter, object.transform());

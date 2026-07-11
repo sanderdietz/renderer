@@ -15,7 +15,7 @@ impl Shape {
                 let line_segment = LineSegment{ start: default_values.start(), end: default_values.end() };
                 let segment = Segment::Straight(line_segment);
                 let path_shape = PathShape{ segments: vec![segment], stroke: default_values.stroke() };
-                return Shape::Path(path_shape);
+                Shape::Path(path_shape)
             },
             DefaultShape::Rectangle => {
                 let width = default_values.width();
@@ -26,22 +26,17 @@ impl Shape {
                 let top_right = egui::Pos2::new(0.5 * width, 0.5 * height);
                 let top_left = egui::Pos2::new(-0.5 * width, 0.5 * height);
 
-                let bottom = Segment::Straight(LineSegment{ start: bottom_left, end: bottom_right });
-                let right = Segment::Straight(LineSegment{ start: bottom_right, end: top_right });
-                let top = Segment::Straight(LineSegment{ start: top_right, end: top_left });
-                let left = Segment::Straight(LineSegment{ start: top_left, end: bottom_left });
-
                 let polygon_shape = PolygonShape {
-                    segments: vec![bottom, right, top, left],
+                    vertices: vec![bottom_left, bottom_right, top_right, top_left],
                     color: default_values.color(),
                     stroke: default_values.stroke()
                 };
-                return Shape::Polygon(polygon_shape);
+                Shape::Polygon(polygon_shape)
             },
             DefaultShape::RegularPolygon => {
                 let mut vertices = Vec::new();
                 let n = default_values.num_edges();
-                let angle = 2.0 * f32::consts::PI / n as f32;
+                let angle = f32::consts::TAU / n as f32;
                 let radius = default_values.radius();
                 for i in 0..n {
                     let x = radius * f32::cos(i as f32 * angle);
@@ -49,26 +44,13 @@ impl Shape {
                     let vertex = egui::Pos2::new(x, y);
                     vertices.push(vertex);
                 }
-                
-                let mut segments = Vec::new();
-                for (i, vertex) in vertices.iter().enumerate() {
-                    if i == n as usize - 1 {
-                        let segment = Segment::Straight(LineSegment{ start: *vertex, end: vertices[0] });
-                        segments.push(segment);
-                    }
-                    else {
-                        let segment = Segment::Straight(LineSegment{ start: *vertex, end: vertices[i + 1] });
-                        segments.push(segment);
-                    }
-                }
 
                 let polygon_shape = PolygonShape {
-                    segments: segments,
+                    vertices: vertices,
                     color: default_values.color(),
                     stroke: default_values.stroke()
                 };
-                println!("regular polygon");
-                return Shape::Polygon(polygon_shape);
+                Shape::Polygon(polygon_shape)
             },
             DefaultShape::Circle => {
                 let ellipse_shape = EllipseShape {
@@ -77,9 +59,7 @@ impl Shape {
                     stroke: default_values.stroke(),
                     color: default_values.color()
                 };
-                println!("circle");
-
-                return Shape::Ellipse(ellipse_shape);
+                Shape::Ellipse(ellipse_shape)
             }
         }
     }
@@ -243,6 +223,12 @@ pub struct PathShape {
 }
 
 impl PathShape {
+    pub fn new(segments: Vec<Segment>, stroke: egui::Stroke) -> Self {
+        Self {
+            segments, stroke
+        }
+    }
+
     pub fn segments(&self) -> &Vec<Segment> {
         &self.segments
     }
@@ -264,18 +250,18 @@ impl PathShape {
 }
 
 pub struct PolygonShape {
-    segments: Vec<Segment>,
+    vertices: Vec<egui::Pos2>,
     color: egui::Color32,
     stroke: egui::Stroke
 }
 
 impl PolygonShape {
-    pub fn segments(&self) -> &Vec<Segment> {
-        &self.segments
+    pub fn vertices(&self) -> &Vec<egui::Pos2> {
+        &self.vertices
     }
     
-    pub fn segments_mut(&mut self) -> &mut Vec<Segment> {
-        &mut self.segments
+    pub fn vertices_mut(&mut self) -> &mut Vec<egui::Pos2> {
+        &mut self.vertices
     }
     
     pub fn color(&self) -> egui::Color32 {
