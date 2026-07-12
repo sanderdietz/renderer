@@ -1,6 +1,6 @@
 use core::f32;
 
-use eframe::egui::{self, CornerRadius};
+use eframe::egui;
 
 use crate::app::Object;
 use crate::app::object::transform::Transform;
@@ -9,7 +9,7 @@ use crate::app::object::geometry::*;
 
 pub struct Viewport {
     rect: egui::Rect,
-    mouse_pos: Option<egui::Pos2>,
+    mouse: egui::PointerState,
     camera_pos: egui::Pos2,
     camera_zoom: f32
 }
@@ -18,7 +18,7 @@ impl Viewport {
     pub fn new(rect: &egui::Rect) -> Self {
         Self {
             rect: *rect,
-            mouse_pos: None,
+            mouse: egui::PointerState::default(),
             camera_pos: egui::Pos2::ZERO,
             camera_zoom: 1.0
         }
@@ -192,32 +192,28 @@ impl Viewport {
 
     pub fn update(&mut self, ui: &mut egui::Ui) {
         self.rect = ui.clip_rect();
-        let response = ui.allocate_response(self.rect.size(), egui::Sense::click_and_drag());
+        
+        let old_mouse = self.mouse.clone();
+        self.mouse = ui.ctx().input(|i| i.pointer.clone());
 
-        // if response.clicked(){
-        //     match self.hovered_object_id {
-        //         Some(id) => self.selected_object_id = Some(id),
-        //         None => self.selected_object_id = None
-        //     }
-        // }
-
-        if let Some(cur_mouse_pos) = ui.ctx().pointer_hover_pos() && self.rect.contains(cur_mouse_pos) {
-            if let Some(old_mouse_pos) = self.mouse_pos && response.dragged_by(egui::PointerButton::Secondary) {
+        if let Some(mouse_pos) = self.mouse.hover_pos() && self.rect.contains(mouse_pos) {
+            if let Some(old_mouse_pos) = old_mouse.hover_pos() {
+                let mouse_pos_world = self.viewport_pos_to_world_pos(mouse_pos);
                 let old_mouse_pos_world = self.viewport_pos_to_world_pos(old_mouse_pos);
-                let cur_mouse_pos_world = self.viewport_pos_to_world_pos(cur_mouse_pos);
-                self.camera_pos += old_mouse_pos_world - cur_mouse_pos_world;
+                let world_movement = old_mouse_pos_world - mouse_pos_world;
+                
+                if self.mouse.secondary_down() && old_mouse.secondary_down() {
+                    self.camera_pos += world_movement;
+                }
             }
-            self.mouse_pos = Some(cur_mouse_pos);
+
             let scroll = ui.ctx().input(|i| i.smooth_scroll_delta);
-            // A single scroll is 40, i.e. 1 / 0.025, pixels
             self.camera_zoom *= f32::powf(2.0, -0.003125 * scroll.y);
-        } else {
-            self.mouse_pos = None;
         }
     }
 
     pub fn check_hitbox(&self, object: &Object) -> bool {
-        match self.mouse_pos {
+        match self.mouse.hover_pos() {
             Some(mouse_pos) => {
                 let transform = object.transform();
                 match object.shape() {
@@ -251,10 +247,6 @@ impl Viewport {
 
     pub fn size(&self) -> egui::Vec2 {
         self.rect.size()
-    }
-
-    pub fn _get_mouse_pos(&self) -> Option<egui::Pos2> {
-        self.mouse_pos
     }
     
     fn pos_in_polygon(&self, pos: egui::Pos2, vertices: &Vec<egui::Pos2>) -> bool {
@@ -360,4 +352,12 @@ pub fn triangle_from_index(vertices: &Vec<egui::Pos2>, i: usize) -> Vec<egui::Po
         i if i == n - 1 => vec![vertices[n - 2], vertices[n - 1], vertices[0]],
         i => vec![vertices[i - 1], vertices[i], vertices[i + 1]]
     }
+}
+
+pub struct Mouse {
+    pos: Option<egui::Pos2>,
+    left: bool,
+    right: bool,
+    middle: bool,
+    scroll: egui::Vec2
 }

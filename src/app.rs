@@ -402,13 +402,6 @@ impl eframe::App for App {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            // if let Some(hover_id) = self.hovered_object_id {
-            //     println!("hover: {}", hover_id);
-            // }
-            // if let Some(select_id) = self.selected_object_id {
-            //     println!("select: {}", select_id);
-            // }
-
             if let Some(viewport) = &mut self.viewport {
                 viewport.update(ui);
             } else {
