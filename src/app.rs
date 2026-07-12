@@ -402,16 +402,20 @@ impl eframe::App for App {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            // match self.hovered_object_id {
-            //     Some(id) => println!("{id}"),
-            //     None => println!("No object is hovered over")
+            // if let Some(hover_id) = self.hovered_object_id {
+            //     println!("hover: {}", hover_id);
             // }
+            // if let Some(select_id) = self.selected_object_id {
+            //     println!("select: {}", select_id);
+            // }
+
             if let Some(viewport) = &mut self.viewport {
                 viewport.update(ui);
             } else {
                 let rect = ui.clip_rect();
                 self.viewport = Some(Viewport::new(&rect));
             }
+
             if let Some(viewport) = &self.viewport {
                 let painter = ui.painter_at(viewport.get_rect());
                 if self.draw_grid {
