@@ -6,11 +6,15 @@ pub mod object;
 use object::Object;
 use object::geometry::*;
 
+use crate::enums::GizmoSegments;
+
 pub struct App {
     viewport: Option<Viewport>,
     objects: Vec<Object>,
     selected_object_id: Option<usize>,
     hovered_object_id: Option<usize>,
+    pressed_state: GizmoSegments,
+
     draw_grid: bool,
     new_object: bool,
     new_name: String
@@ -23,6 +27,7 @@ impl App {
             objects: Vec::new(),
             selected_object_id: None,
             hovered_object_id: None,
+            pressed_state: GizmoSegments::None,
             draw_grid: true,
             new_object: false,
             new_name: String::from("new object")
@@ -36,29 +41,6 @@ impl App {
             }
         }
         false
-    }
-
-    fn get_selected_mut(&mut self) -> Option<&mut Object> {
-        for object in &mut self.objects {
-            match self.selected_object_id {
-                Some(id) => {
-                    if id == object.id() {
-                        return Some(object);
-                    }
-                }
-                None => {}
-            }
-        }
-        None
-    }
-
-    fn get_selected(&self) -> Option<&Object> {
-        for object in self.objects.iter() {
-            if self.is_selected(object) {
-                return Some(object);
-            }
-        }
-        None
     }
 
     fn is_selected(&self, object: &Object) -> bool {
@@ -129,7 +111,7 @@ impl eframe::App for App {
         egui::SidePanel::right("right panel").show(ctx, |ui| {
             ui.checkbox(&mut self.draw_grid, "Grid");
 
-            if let Some(object) = self.get_selected_mut() {
+            if let Some(id) = self.selected_object_id && let Some(object) = self.objects.iter_mut().find(|o| o.id() == id) {
                 ui.label(format!("{}", object.name()));
                 
                 // Display transform
@@ -409,20 +391,68 @@ impl eframe::App for App {
                 self.viewport = Some(Viewport::new(&rect));
             }
 
-            if let Some(viewport) = &self.viewport {
-                let painter = ui.painter_at(viewport.get_rect());
+            if let Some(viewport) = &self.viewport {                
+                let painter = ui.painter_at(viewport.rect());
                 if self.draw_grid {
                     viewport.draw_grid(&painter);
                 }
+                
                 self.hovered_object_id = None;
+                
+                let mouse = viewport.mouse();
+                
                 for object in self.objects.iter() {
                     viewport.draw_object(&painter, object, self.is_selected(object));
-                    if viewport.check_hitbox(object) {
+                    if let Some(mouse_pos) = mouse.hover_pos() && viewport.check_hitbox(mouse_pos, object) {
                         self.hovered_object_id = Some(object.id());
                     }
                 }
-                if let Some(object) = self.get_selected() {
-                    viewport.draw_gizmo(&painter, object.transform());
+                
+                if let Some(mouse_pos) = mouse.hover_pos() && viewport.rect().contains(mouse_pos) {
+                    if mouse.primary_clicked() {
+                        self.selected_object_id = self.hovered_object_id;
+                    }
+                }
+
+                if let Some(id) = self.selected_object_id && let Some(object) = self.objects.iter_mut().find(|o| o.id() == id) {
+                    if let Some(mouse_pos) = mouse.hover_pos() {
+                        if mouse.primary_pressed() {
+                            self.pressed_state = viewport.check_gizmo_hitbox(mouse_pos, object);
+                        }
+                        
+                        if mouse.primary_down() {//&& matches!(self.pressed_state, PressedState::Square) {
+                            let old_mouse_pos = mouse_pos + mouse.delta();
+                            let mouse_pos_world = viewport.viewport_pos_to_world_pos(mouse_pos);
+                            let old_mouse_pos_world = viewport.viewport_pos_to_world_pos(old_mouse_pos);
+                            let world_movement = old_mouse_pos_world - mouse_pos_world;
+                            let transform = object.transform_mut();
+                            let cos = f32::cos(transform.angle);
+                            let sin = f32::sin(transform.angle);
+                            match self.pressed_state {
+                                GizmoSegments::None => {},
+                                GizmoSegments::Square => transform.pos += world_movement,
+                                GizmoSegments::XAxis => {
+                                    let inner_product = cos * world_movement.x + sin * world_movement.y;                                    
+                                    transform.pos += egui::Vec2::new(cos * inner_product, sin * inner_product);
+                                },
+                                GizmoSegments::YAxis => {
+                                    let inner_product = -sin * world_movement.x + cos * world_movement.y;
+                                    transform.pos += egui::Vec2::new(-sin * inner_product, cos * inner_product);
+                                }
+                            }
+                        }
+                        else {
+                            self.pressed_state = GizmoSegments::None;
+                        }
+
+                        let gizmo_segment = match (&self.pressed_state, viewport.check_gizmo_hitbox(mouse_pos, object)) {
+                            (GizmoSegments::Square, _) | (_, GizmoSegments::Square) => GizmoSegments::Square,
+                            (GizmoSegments::XAxis, _) | (_, GizmoSegments::XAxis) => GizmoSegments::XAxis,
+                            (GizmoSegments::YAxis, _) | (_, GizmoSegments::YAxis) => GizmoSegments::YAxis,
+                            _ => GizmoSegments::None
+                        };
+                        viewport.draw_gizmo(&painter, object.transform(), gizmo_segment);
+                    }
                 }
             }
         });

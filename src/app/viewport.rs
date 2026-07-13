@@ -2,6 +2,8 @@ use core::f32;
 
 use eframe::egui;
 
+use crate::enums::GizmoSegments;
+
 use crate::app::Object;
 use crate::app::object::transform::Transform;
 
@@ -24,7 +26,65 @@ impl Viewport {
         }
     }
 
-    pub fn draw_gizmo(&self, painter: &egui::Painter, transform: &Transform) {
+    // 3 functions: Transform -> blue square, green arrow, red arrow
+
+    pub fn gizmo_square(&self, transform: &Transform) -> Vec<egui::Pos2> {
+        let pos = transform.pos;
+        let angle = transform.angle;
+            
+        let x_axis_vec = egui::Vec2::new(f32::cos(-angle), f32::sin(-angle));
+        let y_axis_vec = egui::Vec2::new(f32::sin(-angle), -f32::cos(-angle));
+        
+        let origin = self.world_pos_to_viewport_pos(pos);
+        let side_length = 0.02 * self.rect.width();
+
+        vec![
+            origin,
+            origin + y_axis_vec * side_length,
+            origin + y_axis_vec * side_length + x_axis_vec * side_length,
+            origin + x_axis_vec * side_length
+        ]
+    }
+
+    pub fn gizmo_x_axis(&self, transform: &Transform) -> Vec<egui::Pos2> {
+        let pos = transform.pos;
+        let angle = transform.angle;
+            
+        let x_axis_vec = egui::Vec2::new(f32::cos(-angle), f32::sin(-angle));
+        let y_axis_vec = egui::Vec2::new(f32::sin(-angle), -f32::cos(-angle));
+        
+        let origin = self.world_pos_to_viewport_pos(pos);
+        let axis_length = 0.1 * self.rect.width();
+
+        let x_axis = origin + x_axis_vec * axis_length;
+        vec![
+            origin - 4.0 * y_axis_vec,
+            origin + 4.0 * y_axis_vec,
+            x_axis + 4.0 * y_axis_vec,
+            x_axis - 4.0 * y_axis_vec,
+        ]
+    }
+
+    pub fn gizmo_y_axis(&self, transform: &Transform) -> Vec<egui::Pos2> {
+        let pos = transform.pos;
+        let angle = transform.angle;
+            
+        let x_axis_vec = egui::Vec2::new(f32::cos(-angle), f32::sin(-angle));
+        let y_axis_vec = egui::Vec2::new(f32::sin(-angle), -f32::cos(-angle));
+        
+        let origin = self.world_pos_to_viewport_pos(pos);
+        let axis_length = 0.1 * self.rect.width();
+
+        let y_axis = origin + y_axis_vec * axis_length;
+        vec![
+            origin - 4.0 * x_axis_vec,
+            origin + 4.0 * x_axis_vec,
+            y_axis + 4.0 * x_axis_vec,
+            y_axis - 4.0 * x_axis_vec,
+        ]
+    }
+
+    pub fn draw_gizmo(&self, painter: &egui::Painter, transform: &Transform, gizmo_segment: GizmoSegments) {
         let pos = transform.pos;
         let angle = transform.angle;
             
@@ -37,33 +97,53 @@ impl Viewport {
         let x_axis = origin + x_axis_vec * axis_length;
         let y_axis = origin + y_axis_vec * axis_length;
 
-        painter.line_segment([origin, x_axis], egui::Stroke::new(1.0_f32, egui::Color32::GREEN));
+        let square_stroke_width = match gizmo_segment {
+            GizmoSegments::Square => 4.0_f32,
+            _ => 1.0
+        };
+
+        let x_axis_stroke_width = match gizmo_segment {
+            GizmoSegments::XAxis => 4.0_f32,
+            _ => 1.0
+        };
+
+        let y_axis_stroke_width = match gizmo_segment {
+            GizmoSegments::YAxis => 4.0_f32,
+            _ => 1.0
+        };
+
+        let x_axis_arrow = match gizmo_segment {
+            GizmoSegments::XAxis => vec![0.05, 0.15, 0.1],
+            _ => vec![0.0, 0.1, 0.05]
+        };
+
+        let y_axis_arrow = match gizmo_segment {
+            GizmoSegments::YAxis => vec![0.05, 0.15, 0.1],
+            _ => vec![0.0, 0.1, 0.05]
+        };
+
+        painter.line_segment([origin, x_axis], egui::Stroke::new(x_axis_stroke_width, egui::Color32::GREEN));
         painter.add(egui::Shape::convex_polygon(vec![
-                x_axis,
-                x_axis - x_axis_vec * 0.1 * axis_length + y_axis_vec * 0.05 * axis_length,
-                x_axis - x_axis_vec * 0.1 * axis_length - y_axis_vec * 0.05 * axis_length
+                x_axis + x_axis_vec * x_axis_arrow[0] * axis_length,
+                x_axis - x_axis_vec * x_axis_arrow[1] * axis_length + y_axis_vec * x_axis_arrow[2] * axis_length,
+                x_axis - x_axis_vec * x_axis_arrow[1] * axis_length - y_axis_vec * x_axis_arrow[2] * axis_length
             ], 
             egui::Color32::GREEN, 
             egui::Stroke::NONE
         ));
-        painter.line_segment([origin, y_axis], egui::Stroke::new(1.0_f32, egui::Color32::RED));
+        painter.line_segment([origin, y_axis], egui::Stroke::new(y_axis_stroke_width, egui::Color32::RED));
         painter.add(egui::Shape::convex_polygon(vec![
-                y_axis,
-                y_axis - y_axis_vec * 0.1 * axis_length + x_axis_vec * 0.05 * axis_length,
-                y_axis - y_axis_vec * 0.1 * axis_length - x_axis_vec * 0.05 * axis_length
+                y_axis + y_axis_vec * y_axis_arrow[0] * axis_length,
+                y_axis - y_axis_vec * y_axis_arrow[1] * axis_length + x_axis_vec * y_axis_arrow[2] * axis_length,
+                y_axis - y_axis_vec * y_axis_arrow[1] * axis_length - x_axis_vec * y_axis_arrow[2] * axis_length
             ], 
             egui::Color32::RED, 
             egui::Stroke::NONE
         ));
 
-        painter.add(egui::Shape::convex_polygon(vec![
-                origin,
-                origin + y_axis_vec * 0.2 * axis_length,
-                origin + y_axis_vec * 0.2 * axis_length + x_axis_vec * 0.2 * axis_length,
-                origin + x_axis_vec * 0.2 * axis_length
-            ],
+        painter.add(egui::Shape::convex_polygon(self.gizmo_square(transform),
             egui::Color32::from_rgba_unmultiplied(0, 0, 255, 100),
-            egui::Stroke::new(1.0_f32, egui::Color32::BLUE)
+            egui::Stroke::new(square_stroke_width, egui::Color32::BLUE)
         ));
     }
 
@@ -212,28 +292,43 @@ impl Viewport {
         }
     }
 
-    pub fn check_hitbox(&self, object: &Object) -> bool {
-        match self.mouse.hover_pos() {
-            Some(mouse_pos) => {
-                let transform = object.transform();
-                match object.shape() {
-                    Some(Shape::Path(path_shape)) => false,
-                    Some(Shape::Polygon(polygon_shape)) => {
-                        let vertices = self.vertices_to_viewport(polygon_shape.vertices(), transform);
-                        self.pos_in_polygon(mouse_pos, &vertices)
-                    },
-                    Some(Shape::Ellipse(ellipse_shape)) => false,
-                    None => {
-                        let transform_pos = self.world_pos_to_viewport_pos(transform.pos);
-                        transform_pos.distance_sq(mouse_pos) < 6.0 * 6.0
-                    },
-                }
-            }
-            None => false
+    pub fn check_gizmo_hitbox(&self, pos: egui::Pos2, object: &Object) -> GizmoSegments {
+        let transform = object.transform();
+        let square = self.gizmo_square(transform);
+        let x_axis = self.gizmo_x_axis(transform);
+        let y_axis = self.gizmo_y_axis(transform);
+
+        if self.pos_in_polygon(pos, &square) {
+            GizmoSegments::Square
+        }
+        else if self.pos_in_polygon(pos, &x_axis) {
+            GizmoSegments::XAxis
+        }
+        else if self.pos_in_polygon(pos, &y_axis) {
+            GizmoSegments::YAxis
+        }
+        else {
+            GizmoSegments::None
         }
     }
 
-    pub fn camera_zoom(&self) -> f32 {
+    pub fn check_hitbox(&self, pos: egui::Pos2, object: &Object) -> bool {
+        let transform = object.transform();
+        match object.shape() {
+            Some(Shape::Path(path_shape)) => false,
+            Some(Shape::Polygon(polygon_shape)) => {
+                let vertices = self.vertices_to_viewport(polygon_shape.vertices(), transform);
+                self.pos_in_polygon(pos, &vertices)
+            },
+            Some(Shape::Ellipse(ellipse_shape)) => false,
+            None => {
+                let transform_pos = self.world_pos_to_viewport_pos(transform.pos);
+                transform_pos.distance_sq(pos) < 6.0 * 6.0
+            },
+        }
+    }
+
+    pub fn _camera_zoom(&self) -> f32 {
         self.camera_zoom
     }
 
@@ -241,12 +336,16 @@ impl Viewport {
         self.camera_pos
     }
 
-    pub fn get_rect(&self) -> egui::Rect {
+    pub fn rect(&self) -> egui::Rect {
         self.rect
     }
 
-    pub fn size(&self) -> egui::Vec2 {
+    pub fn _size(&self) -> egui::Vec2 {
         self.rect.size()
+    }
+
+    pub fn mouse(&self) -> &egui::PointerState {
+        &self.mouse
     }
     
     fn pos_in_polygon(&self, pos: egui::Pos2, vertices: &Vec<egui::Pos2>) -> bool {
@@ -352,12 +451,4 @@ pub fn triangle_from_index(vertices: &Vec<egui::Pos2>, i: usize) -> Vec<egui::Po
         i if i == n - 1 => vec![vertices[n - 2], vertices[n - 1], vertices[0]],
         i => vec![vertices[i - 1], vertices[i], vertices[i + 1]]
     }
-}
-
-pub struct Mouse {
-    pos: Option<egui::Pos2>,
-    left: bool,
-    right: bool,
-    middle: bool,
-    scroll: egui::Vec2
 }
